@@ -18,6 +18,7 @@ class ActivationType(Enum):
     """ Defines available activation functions. """
     IDENTITY = 1
     TANH = 2
+    RELU = 3
 
 # TODO
 class IdentityActivation(object):
@@ -40,6 +41,20 @@ class TanhActivation(object):
     def backward(self, activation, output_grad):
         """ Implements backward pass (y = tanh(x) => dy/dx = (1 - tanh(x)^2). """
         return output_grad * (1 - numpy.square(activation))
+
+
+# TODO
+class ReLuActivation(object):
+    """ Class that implements tanh activation function (y = tanh(x)). """
+    def forward(self, preactivation):
+        """ Implements forward pass. Apply tanh to preactivation and return it. """
+        return numpy.maximum(preactivation, numpy.zeros(preactivation.shape, dtype=numpy.float))
+
+    def backward(self, activation, output_grad):
+        """ Implements backward pass (y = tanh(x) => dy/dx = (1 - tanh(x)^2). """
+        ret_grad = numpy.copy(output_grad)
+        ret_grad[activation <= 0] = 0
+        return ret_grad
 
 class SoftmaxWithCrossEntropyLayer(object):
     """ Class that implements softmax + cross-entropy functionality. """
@@ -112,8 +127,10 @@ class FullyConnectedLayer(object):
         # Set activation function according to given type.
         if activation_type == ActivationType.IDENTITY:
             self.activation = IdentityActivation()
-        else:
+        elif activation_type == ActivationType.TANH:
             self.activation = TanhActivation()
+        else:
+            self.activation = ReLuActivation()
         # Declare input/output arrays to be used later.
         self.x_input = None
         self.y_output = numpy.zeros((outputs_count, 1), dtype=numpy.float)
@@ -161,7 +178,7 @@ class MLPNetwork(object):
     A multilayer perceptron is a feedforward artificial neural network model that has one hidden fully connected layer,
     and one output fully connected layer, both with nonlinear activations. The top layer (third one) is a softmax layer.
     """
-    def __init__(self, rng, inputs_count, hidden_count, outputs_count):
+    def __init__(self, rng, inputs_count, hidden_count, another_hidden_count, outputs_count):
         """Initialize the parameters for the multilayer perceptron.
 
         :param rng: A random number generator used to initialize weights
@@ -178,9 +195,18 @@ class MLPNetwork(object):
         )
 
         # Create output layer (second fully connected layer).
-        self.output_layer = FullyConnectedLayer(
+        self.another_hidden_layer = FullyConnectedLayer(
             rng=rng,
             inputs_count=hidden_count,
+            outputs_count=another_hidden_count,
+            activation_type=ActivationType.RELU
+        )
+
+
+        # Create output layer (second fully connected layer).
+        self.output_layer = FullyConnectedLayer(
+            rng=rng,
+            inputs_count=another_hidden_count,
             outputs_count=outputs_count,
             activation_type=ActivationType.IDENTITY
         )
@@ -194,7 +220,8 @@ class MLPNetwork(object):
         :param x_input: Input to the network.
         """
         self.hidden_layer.forward(x_input)
-        self.output_layer.forward(self.hidden_layer.y_output)
+        self.another_hidden_layer.forward(self.hidden_layer.y_output)
+        self.output_layer.forward(self.another_hidden_layer.y_output)
         self.softmax_layer.forward(self.output_layer.y_output)
 
     def backward(self, t_target):
@@ -205,7 +232,8 @@ class MLPNetwork(object):
         """
         self.softmax_layer.backward(t_target)
         self.output_layer.backward(self.softmax_layer.input_gradients)
-        self.hidden_layer.backward(self.output_layer.input_gradients)
+        self.another_hidden_layer.backward(self.output_layer.input_gradients)
+        self.hidden_layer.backward(self.another_hidden_layer.input_gradients)
 
     def update_weights(self, alpha):
         """ Performs update of the network weights by updating weight on each child layer.
@@ -213,6 +241,7 @@ class MLPNetwork(object):
         :param alpha: Learning rate to be used for weight update.
         """
         self.output_layer.update_weights(alpha)
+        self.another_hidden_layer.update_weights(alpha)
         self.hidden_layer.update_weights(alpha)
 
     def test(self, dataset):
@@ -244,7 +273,7 @@ def train_nn_with_sgd(dataset_path, epochs_count, alpha):
     num_classes = 10
     train_set, valid_set, test_set = load_data(dataset_path)
     # Initialize neural network.
-    neural_net = MLPNetwork(numpy.random, 28 * 28, 100, num_classes)
+    neural_net = MLPNetwork(numpy.random, 28 * 28, 100, 50, num_classes)
     # Print header.
     print('\nEpoch\tTrainingError%%\tValidationError%%\tTestError%%')
     # Train network for limited number of epochs.
@@ -270,3 +299,6 @@ def train_nn_with_sgd(dataset_path, epochs_count, alpha):
 
 if __name__ == "__main__":
     train_nn_with_sgd(dataset_path=r'../data/mnist.pkl.gz', epochs_count=100, alpha=0.01)
+
+# tanh na kvadrat 
+# stochastic???
