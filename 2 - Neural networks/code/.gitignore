@@ -1,8 +1,0 @@
-#Visual Studio files
-.vs
-
-#Visual Studio Code files
-.vscode
-
-#Compiled Python files
-*.pyc
