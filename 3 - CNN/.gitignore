@@ -1,3 +1,3 @@
-inception_resnet_v2/*
+inception_resnet_v2/*.ckpt
 logs_new/*
 logs_test/*
